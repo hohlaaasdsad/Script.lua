@@ -1,86 +1,223 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 local ESPGui = Instance.new("ScreenGui")
-ESPGui.Name = "SimpleESP"
+ESPGui.Name = "AdvancedESP"
 ESPGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local ESPEnabled = false
+-- Настройки
+local ESP_SETTINGS = {
+    Enabled = false,
+    BoxESP = false,
+    Color = Color3.new(0, 0, 0),  -- Черный цвет
+    TextColor = Color3.new(1, 1, 1) -- Белый текст
+}
+
 local ESPObjects = {}
 
--- Функция создания ESP для игрока
-local function CreatePlayerESP(player)
+-- Функция создания ESP
+local function CreateESP(player)
     if player == LocalPlayer then return end
-    
+
     local character = player.Character or player.CharacterAdded:Wait()
-    
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- Основной Highlight
     local highlight = Instance.new("Highlight")
     highlight.Name = player.Name .. "_ESP"
-    highlight.FillColor = Color3.fromRGB(255, 50, 50)  -- Красный
-    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
-    highlight.FillTransparency = 0.7
+    highlight.FillColor = ESP_SETTINGS.Color
+    highlight.OutlineColor = ESP_SETTINGS.Color
+    highlight.FillTransparency = 0.9
     highlight.OutlineTransparency = 0
     highlight.Adornee = character
     highlight.Parent = ESPGui
-    
-    ESPObjects[player] = highlight
-    
-    -- Обновляем при смерти
+
+    -- Текст с дистанцией
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(0, 100, 0, 20)
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextColor3 = ESP_SETTINGS.TextColor
+    textLabel.TextSize = 14
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.Text = ""
+    textLabel.Parent = ESPGui
+
+    -- Box (создается только при включенном BoxESP)
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = player.Name .. "_BOX"
+    box.Color3 = ESP_SETTINGS.Color
+    box.Transparency = 0.7
+    box.Adornee = rootPart
+    box.AlwaysOnTop = true
+    box.Size = Vector3.new(4, 6, 4)
+    box.Visible = ESP_SETTINGS.BoxESP
+    box.Parent = ESPGui
+
+    ESPObjects[player] = {
+        Character = character,
+        Highlight = highlight,
+        TextLabel = textLabel,
+        Box = box
+    }
+
+    -- Обновление при смерти
     player.CharacterAdded:Connect(function(newChar)
+        ESPObjects[player].Character = newChar
         highlight.Adornee = newChar
+        box.Adornee = newChar:WaitForChild("HumanoidRootPart")
     end)
+end
+
+-- Функция обновления ESP
+local function UpdateESP()
+    for player, data in pairs(ESPObjects) do
+        if data.Character and data.Character.Parent then
+            local rootPart = data.Character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                -- Обновляем позицию текста
+                local position, onScreen = Camera:WorldToViewportPoint(rootPart.Position + Vector3.new(0, 3, 0))
+                if onScreen then
+                    data.TextLabel.Position = UDim2.new(0, position.X, 0, position.Y)
+                    data.TextLabel.Visible = true
+                    -- Обновляем текст с дистанцией
+                    local distance = (rootPart.Position - Camera.CFrame.Position).Magnitude
+                    data.TextLabel.Text = player.Name .. " [" .. math.floor(distance) .. "m]"
+                else
+                    data.TextLabel.Visible = false
+                end
+
+                -- Обновляем Box ESP если включен
+                if ESP_SETTINGS.BoxESP then
+                    data.Box.Visible = true
+                    data.Box.Adornee = rootPart
+                else
+                    data.Box.Visible = false
+                end
+            end
+        else
+            -- Удаляем если игрок вышел
+            data.Highlight:Destroy()
+            data.TextLabel:Destroy()
+            data.Box:Destroy()
+            ESPObjects[player] = nil
+        end
+    end
 end
 
 -- Включение/выключение ESP
 local function ToggleESP(enable)
-    ESPEnabled = enable
+    ESP_SETTINGS.Enabled = enable
     
     if enable then
         -- Создаем ESP для всех игроков
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
-                CreatePlayerESP(player)
+                CreateESP(player)
             end
         end
         
         -- Создаем ESP для новых игроков
-        Players.PlayerAdded:Connect(CreatePlayerESP)
+        Players.PlayerAdded:Connect(CreateESP)
+        
+        -- Запускаем обновление
+        RunService.Heartbeat:Connect(UpdateESP)
     else
         -- Удаляем все ESP
-        for _, esp in pairs(ESPObjects) do
-            esp:Destroy()
+        for _, data in pairs(ESPObjects) do
+            data.Highlight:Destroy()
+            data.TextLabel:Destroy()
+            data.Box:Destroy()
         end
         ESPObjects = {}
     end
 end
 
--- Кнопка управления
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 100, 0, 40)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.Text = "Q"
-ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
-ToggleButton.TextColor3 = Color3.new(1, 1, 1)
-ToggleButton.Parent = ESPGui
+-- Создаем GUI
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 120, 0, 100)
+MainFrame.Position = UDim2.new(0, 10, 0, 10)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Parent = ESPGui
 
-ToggleButton.MouseButton1Click:Connect(function()
-    ESPEnabled = not ESPEnabled
-    ToggleButton.Text = " " .. (ESPEnabled and "Q" or "Q") .. " Q"
-    ToggleButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
-    ToggleESP(ESPEnabled)
+-- Кнопка ESP
+local ESPButton = Instance.new("TextButton")
+ESPButton.Size = UDim2.new(0.9, 0, 0, 30)
+ESPButton.Position = UDim2.new(0.05, 0, 0, 10)
+ESPButton.Text = "ESP: OFF (Y)"
+ESPButton.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+ESPButton.TextColor3 = Color3.new(1, 1, 1)
+ESPButton.Parent = MainFrame
+
+-- Кнопка Box ESP
+local BoxButton = Instance.new("TextButton")
+BoxButton.Size = UDim2.new(0.9, 0, 0, 30)
+BoxButton.Position = UDim2.new(0.05, 0, 0, 50)
+BoxButton.Text = "BOX: OFF (U)"
+BoxButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+BoxButton.TextColor3 = Color3.new(1, 1, 1)
+BoxButton.Parent = MainFrame
+
+-- Обработчики кнопок
+ESPButton.MouseButton1Click:Connect(function()
+    ESP_SETTINGS.Enabled = not ESP_SETTINGS.Enabled
+    ESPButton.Text = "ESP: " .. (ESP_SETTINGS.Enabled and "ON" or "OFF") .. " (Y)"
+    ESPButton.BackgroundColor3 = ESP_SETTINGS.Enabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+    ToggleESP(ESP_SETTINGS.Enabled)
 end)
 
--- Горячая клавиша Q
-game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.Q then
-        ESPEnabled = not ESPEnabled
-        ToggleButton.Text = " " .. (ESPEnabled and "Q" or "Q") .. "Q"
-        ToggleButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
-        ToggleESP(ESPEnabled)
+BoxButton.MouseButton1Click:Connect(function()
+    ESP_SETTINGS.BoxESP = not ESP_SETTINGS.BoxESP
+    BoxButton.Text = "BOX: " .. (ESP_SETTINGS.BoxESP and "ON" or "OFF") .. " (U)"
+    BoxButton.BackgroundColor3 = ESP_SETTINGS.BoxESP and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(60, 60, 80)
+    
+    -- Обновляем видимость боксов
+    for _, data in pairs(ESPObjects) do
+        data.Box.Visible = ESP_SETTINGS.BoxESP
     end
 end)
 
--- Первоначальное состояние
-ToggleButton.Text = "Q"
-ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+-- Горячие клавиши
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    
+    if input.KeyCode == Enum.KeyCode.Y then
+        ESP_SETTINGS.Enabled = not ESP_SETTINGS.Enabled
+        ESPButton.Text = "ESP: " .. (ESP_SETTINGS.Enabled and "ON" or "OFF") .. " (Y)"
+        ESPButton.BackgroundColor3 = ESP_SETTINGS.Enabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+        ToggleESP(ESP_SETTINGS.Enabled)
+    elseif input.KeyCode == Enum.KeyCode.U then
+        ESP_SETTINGS.BoxESP = not ESP_SETTINGS.BoxESP
+        BoxButton.Text = "BOX: " .. (ESP_SETTINGS.BoxESP and "ON" or "OFF") .. " (U)"
+        BoxButton.BackgroundColor3 = ESP_SETTINGS.BoxESP and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(60, 60, 80)
+        
+        for _, data in pairs(ESPObjects) do
+            data.Box.Visible = ESP_SETTINGS.BoxESP
+        end
+    end
+end)
+
+-- Перетаскивание окна
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
