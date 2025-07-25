@@ -1,0 +1,86 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local ESPGui = Instance.new("ScreenGui")
+ESPGui.Name = "SimpleESP"
+ESPGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local ESPEnabled = false
+local ESPObjects = {}
+
+-- Функция создания ESP для игрока
+local function CreatePlayerESP(player)
+    if player == LocalPlayer then return end
+    
+    local character = player.Character or player.CharacterAdded:Wait()
+    
+    local highlight = Instance.new("Highlight")
+    highlight.Name = player.Name .. "_ESP"
+    highlight.FillColor = Color3.fromRGB(255, 50, 50)  -- Красный
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.7
+    highlight.OutlineTransparency = 0
+    highlight.Adornee = character
+    highlight.Parent = ESPGui
+    
+    ESPObjects[player] = highlight
+    
+    -- Обновляем при смерти
+    player.CharacterAdded:Connect(function(newChar)
+        highlight.Adornee = newChar
+    end)
+end
+
+-- Включение/выключение ESP
+local function ToggleESP(enable)
+    ESPEnabled = enable
+    
+    if enable then
+        -- Создаем ESP для всех игроков
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                CreatePlayerESP(player)
+            end
+        end
+        
+        -- Создаем ESP для новых игроков
+        Players.PlayerAdded:Connect(CreatePlayerESP)
+    else
+        -- Удаляем все ESP
+        for _, esp in pairs(ESPObjects) do
+            esp:Destroy()
+        end
+        ESPObjects = {}
+    end
+end
+
+-- Кнопка управления
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 100, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.Text = "Q"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.Parent = ESPGui
+
+ToggleButton.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    ToggleButton.Text = " " .. (ESPEnabled and "Q" or "Q") .. " Q"
+    ToggleButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+    ToggleESP(ESPEnabled)
+end)
+
+-- Горячая клавиша Q
+game:GetService("UserInputService").InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.Q then
+        ESPEnabled = not ESPEnabled
+        ToggleButton.Text = " " .. (ESPEnabled and "Q" or "Q") .. "Q"
+        ToggleButton.BackgroundColor3 = ESPEnabled and Color3.fromRGB(30, 80, 30) or Color3.fromRGB(80, 30, 30)
+        ToggleESP(ESPEnabled)
+    end
+end)
+
+-- Первоначальное состояние
+ToggleButton.Text = "Q"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
