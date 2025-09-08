@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "capture.js": {
+      "maxDuration": 10
+    }
+  },
+  "routes": [
+    {
+      "src": "/capture",
+      "dest": "/capture.js"
+    }
+  ]
+}
